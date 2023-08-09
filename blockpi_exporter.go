@@ -139,6 +139,10 @@ func main() {
 		log.Fatal().Msg("BLOCKPI_API_KEY is not set")
 		panic("BLOCKPI_API_KEY is not set")
 	}
+	port := os.Getenv("BLOCKPI_LISTEN_PORT")
+	if len(port) == 0 {
+		port = "8080"
+	}
 
 	log.Debug().Msg("Ping BlockPi API")
 	_, err := getBalance(apiKey)
@@ -154,7 +158,7 @@ func main() {
 	http.Handle("/", http.RedirectHandler("/metrics", http.StatusMovedPermanently))
 	http.Handle("/metrics", promhttp.Handler())
 
-	log.Info().Msg("Starting BlockPi exporter, listening on port 8080")
-	http.ListenAndServe(":8080", nil)
+	log.Info().Msgf("Starting BlockPi exporter, listening on port %s", port)
+	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 	log.Info().Msg("Shutting down BlockPi exporter")
 }
