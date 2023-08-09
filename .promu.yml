@@ -1,0 +1,11 @@
+repository:
+  path: github.com/soloradish/blockpi_exporter
+go:
+  cgo: false
+crossbuild:
+  platforms:
+    - linux/amd64
+    - linux/arm64
+tarball:
+  files:
+    - README.md
