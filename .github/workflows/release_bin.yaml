@@ -1,0 +1,38 @@
+name: release_bin
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          check-latest: true
+
+      - name: Install Promu
+        run: |
+          go get github.com/prometheus/promu
+          go install github.com/prometheus/promu
+
+      - name: Run Promu Crossbuild
+        run: |
+          GOARCH=arm64 promu build -v --prefix build
+          mv build/blockpi_exporter build/blockpi_exporter_arm64
+          GOARCH=amd64 promu build -v --prefix build
+          mv build/blockpi_exporter build/blockpi_exporter_amd64
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/*
