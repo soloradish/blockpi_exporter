@@ -158,6 +158,11 @@ func main() {
 	http.Handle("/", http.RedirectHandler("/metrics", http.StatusMovedPermanently))
 	http.Handle("/metrics", promhttp.Handler())
 
+	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+
 	log.Info().Msgf("Starting BlockPi exporter, listening on port %s", port)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 	log.Info().Msg("Shutting down BlockPi exporter")
