@@ -14,7 +14,10 @@ import (
 	"os"
 )
 
-const apiEndpoint = "https://api.blockpi.io/openapi/v1/rpc"
+const (
+	apiEndpoint      = "https://api.blockpi.io/openapi/v1/rpc"
+	failureTolerance = 5
+)
 
 // RPCRequest represents the request structure for the RPC call
 type RPCRequest struct {
@@ -93,23 +96,25 @@ type Metrics struct {
 func newMetrics() Metrics {
 	return Metrics{
 		up: prometheus.NewDesc("up",
-			"BlockPi is up",
+			"Blockpi exporter is up",
 			nil, nil),
-		balance: prometheus.NewDesc("account_balance",
+		balance: prometheus.NewDesc("blockpi_account_balance",
 			"Balance of BlockPi",
 			nil, nil),
 	}
 }
 
 type Collector struct {
-	apiKey  string
-	metrics Metrics
+	apiKey     string
+	metrics    Metrics
+	errorCount int
 }
 
 func newCollector(apiKey string) *Collector {
 	return &Collector{
-		apiKey:  apiKey,
-		metrics: newMetrics(),
+		apiKey:     apiKey,
+		metrics:    newMetrics(),
+		errorCount: 0,
 	}
 }
 
@@ -120,13 +125,24 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	balance, err := getBalance(c.apiKey)
+	hasError := false
 	if err != nil {
-		// todo: log error
-		ch <- prometheus.MustNewConstMetric(c.metrics.up, prometheus.GaugeValue, 0)
-		return
+		c.errorCount++
+		hasError = true
+		log.Err(err).Msg("Error when getting balance")
+	} else {
+		c.errorCount = 0
 	}
-	ch <- prometheus.MustNewConstMetric(c.metrics.up, prometheus.GaugeValue, 1)
-	ch <- prometheus.MustNewConstMetric(c.metrics.balance, prometheus.GaugeValue, balance)
+
+	if c.errorCount > failureTolerance {
+		log.Info().Msg("BlockPi query consistently return error, setting `up` to 0")
+		ch <- prometheus.MustNewConstMetric(c.metrics.up, prometheus.GaugeValue, 0)
+	} else {
+		ch <- prometheus.MustNewConstMetric(c.metrics.up, prometheus.GaugeValue, 1)
+	}
+	if !hasError {
+		ch <- prometheus.MustNewConstMetric(c.metrics.balance, prometheus.GaugeValue, balance)
+	}
 }
 
 func main() {
@@ -165,5 +181,4 @@ func main() {
 
 	log.Info().Msgf("Starting BlockPi exporter, listening on port %s", port)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
-	log.Info().Msg("Shutting down BlockPi exporter")
 }
